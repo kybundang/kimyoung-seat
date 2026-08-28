@@ -173,9 +173,6 @@ def parse_student_file(contents: bytes) -> pd.DataFrame:
 
     return None
 
-# ==============================================================================
-# 정밀 좌석표 엑셀 파서
-# ==============================================================================
 def parse_seat_excel(contents: bytes):
     import openpyxl
     wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
@@ -563,7 +560,7 @@ def student_view():
     """
 
 # ==============================================================================
-# 2. 관리자 화면
+# 2. 관리자 화면 (전체화면 모드 버튼 및 오버레이 완비)
 # ==============================================================================
 @app.get("/admin/students", response_class=HTMLResponse)
 def admin_students_view(request: Request):
@@ -582,7 +579,7 @@ def admin_students_view(request: Request):
         <header id="mobile-header" class="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs">
             <div class="flex items-center gap-3">
                 <button onclick="toggleMobileDrawer()" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold transition">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke_linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                 </button>
                 <h1 class="text-base font-extrabold text-blue-700">김영편입 좌석관리</h1>
             </div>
@@ -691,7 +688,7 @@ def admin_students_view(request: Request):
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-6">
                     <div>
                         <h2 class="text-xl md:text-2xl font-bold text-slate-900">좌석표 설정 및 인쇄</h2>
-                        <p class="text-xs md:text-sm text-slate-500 mt-1 font-medium">강의실별 좌석수가 [301호 (48석)] 형태로 정확히 계산되어 표시됩니다.</p>
+                        <p class="text-xs md:text-sm text-slate-500 mt-1 font-medium">[저장]을 누르면 화면 새로고침 없이 해당 반의 설정만 즉시 적용됩니다.</p>
                     </div>
                     <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition">
                         강의실 좌석표 엑셀 업로드 (.xlsx)
@@ -722,17 +719,24 @@ def admin_students_view(request: Request):
             </div>
 
             <!-- 탭 3: 로그인 QR -->
-            <div id="tab-qr" class="hidden" onclick="toggleQrFullscreenHeader()">
+            <div id="tab-qr" class="hidden">
                 <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
                         <h2 class="text-xl md:text-2xl font-bold text-slate-900">로그인 QR</h2>
-                        <p class="text-xs text-slate-500 mt-0.5 font-medium">화면을 가볍게 터치하면 상단 메뉴바가 토글됩니다.</p>
+                        <p class="text-xs text-slate-500 mt-0.5 font-medium">데스크에 상시 띄워두거나 전체화면으로 활용할 수 있습니다.</p>
                     </div>
-                    <button onclick="window.print()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs md:text-sm font-bold hover:bg-slate-900 transition shadow-sm">포스터 인쇄 / PDF 저장</button>
+                    <div class="flex gap-2">
+                        <button onclick="enterQrFullscreen()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs md:text-sm font-bold hover:bg-blue-700 transition shadow-sm flex items-center gap-1.5">
+                            ⛶ 전체화면 모드
+                        </button>
+                        <button onclick="window.print()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs md:text-sm font-bold hover:bg-slate-900 transition shadow-sm">
+                            포스터 인쇄 / PDF 저장
+                        </button>
+                    </div>
                 </div>
 
                 <div class="flex justify-center items-center py-4">
-                    <div class="bg-white border-2 border-blue-600 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-xl text-center">
+                    <div id="qr-card-container" class="bg-white border-2 border-blue-600 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-xl text-center transition-all duration-300">
                         <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
                             <div id="qr-live-date" class="text-xs font-bold text-blue-900"></div>
                             <div id="qr-live-clock" class="text-xl font-black text-blue-600 font-mono mt-0.5">00:00:00</div>
@@ -750,6 +754,25 @@ def admin_students_view(request: Request):
                 </div>
             </div>
         </main>
+
+        <!-- QR 전용 전체화면 모드 오버레이 -->
+        <div id="qr-fullscreen-overlay" class="fixed inset-0 bg-slate-950/95 z-50 hidden flex-col items-center justify-center p-4">
+            <button onclick="exitQrFullscreen()" class="absolute top-6 right-6 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold transition flex items-center gap-1.5 backdrop-blur-md">
+                ✕ 전체화면 종료 (ESC)
+            </button>
+            <div class="bg-white border-4 border-blue-500 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center animate-fade-in">
+                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 mb-5">
+                    <div id="fs-qr-live-date" class="text-xs font-extrabold text-blue-900"></div>
+                    <div id="fs-qr-live-clock" class="text-2xl font-black text-blue-600 font-mono mt-0.5 tracking-wider">00:00:00</div>
+                </div>
+                <div class="text-xl font-black text-slate-900 mb-5 tracking-tight">김영편입 좌석표 신청</div>
+                <div class="bg-slate-50 p-5 rounded-2xl inline-block border border-slate-200 mb-5 shadow-inner">
+                    <div id="fs-qrcode" class="flex justify-center"></div>
+                </div>
+                <p class="text-sm font-black text-blue-600 mb-1">카메라로 스캔 ➔ 로그인 ➔ 좌석 선택</p>
+                <p class="text-xs text-slate-400 font-medium">초기 비밀번호는 1234 입니다.</p>
+            </div>
+        </div>
 
         <!-- 신청 완료 학생 명단 모달 -->
         <div id="reserved-modal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 p-4">
@@ -922,6 +945,11 @@ def admin_students_view(request: Request):
                 const qrClock = document.getElementById("qr-live-clock");
                 if (qrDate) qrDate.innerText = dateStr;
                 if (qrClock) qrClock.innerText = clockStr;
+
+                const fsDate = document.getElementById("fs-qr-live-date");
+                const fsClock = document.getElementById("fs-qr-live-clock");
+                if (fsDate) fsDate.innerText = dateStr;
+                if (fsClock) fsClock.innerText = clockStr;
             }
             setInterval(updateAdminClocks, 1000);
             updateAdminClocks();
@@ -931,12 +959,20 @@ def admin_students_view(request: Request):
                 drawer.classList.toggle("hidden");
             }
 
-            function toggleQrFullscreenHeader() {
-                const header = document.getElementById("mobile-header");
-                if(window.innerWidth < 768) {
-                    header.classList.toggle("hidden");
-                }
+            function enterQrFullscreen() {
+                document.getElementById("qr-fullscreen-overlay").classList.replace("hidden", "flex");
+                generateFullscreenQR();
             }
+
+            function exitQrFullscreen() {
+                document.getElementById("qr-fullscreen-overlay").classList.replace("flex", "hidden");
+            }
+
+            window.addEventListener("keydown", function(e) {
+                if (e.key === "Escape") {
+                    exitQrFullscreen();
+                }
+            });
 
             function switchTab(tab) {
                 document.getElementById("tab-students").classList.add("hidden");
@@ -1566,6 +1602,22 @@ def admin_students_view(request: Request):
                 });
             }
 
+            async function generateFullscreenQR() {
+                const currentHost = window.location.origin;
+                const targetUrl = `${currentHost}/`;
+                
+                const fsQrContainer = document.getElementById("fs-qrcode");
+                fsQrContainer.innerHTML = "";
+                new QRCode(fsQrContainer, {
+                    text: targetUrl,
+                    width: 260,
+                    height: 260,
+                    colorDark : "#0f172a",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+            }
+
             async function resetPassword(username) {
                 if (!confirm(`${username} 학생의 비밀번호를 '1234'로 초기화하시겠습니까?`)) return;
                 const res = await fetch(`/api/admin/students/${encodeURIComponent(username)}/reset-pw`, { method: 'POST' });
@@ -1793,7 +1845,7 @@ def api_seats(username: str, class_name: str):
     if room_data:
         title, orig_rows, orig_cols, grid = room_data[0], room_data[1], room_data[2], json.loads(room_data[3])
     else:
-        title = room_name
+        title, cols = room_name, 4
         grid = [[{"type": "seat", "id": f"{chr(65+r)}{c+1}"} for c in range(4)] for r in range(5)]
         
     cols = len(grid[0]) if grid else 4
