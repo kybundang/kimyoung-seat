@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Form, UploadFile, File, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 import sqlite3
 import pandas as pd
 import io
@@ -560,7 +560,7 @@ def student_view():
     """
 
 # ==============================================================================
-# 2. 관리자 화면 (학생 수정 버튼 및 모달 완비)
+# 2. 관리자 화면
 # ==============================================================================
 @app.get("/admin/students", response_class=HTMLResponse)
 def admin_students_view(request: Request):
@@ -622,7 +622,7 @@ def admin_students_view(request: Request):
             
             <!-- 탭 1: 학생명단 -->
             <div id="tab-students">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 mb-4">
                     <div>
                         <div class="flex items-center gap-3">
                             <h2 class="text-xl md:text-2xl font-bold text-slate-900">학생명단</h2>
@@ -632,17 +632,27 @@ def admin_students_view(request: Request):
                         </div>
                         <p id="summary-text" class="text-xs md:text-sm text-slate-500 mt-1 font-medium">불러오는 중...</p>
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button onclick="clearAllStudents()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-2 rounded-lg text-xs md:text-sm font-bold transition shadow-xs">
-                            ⚠️ 명단 초기화
-                        </button>
-                        <button onclick="openAddStudentModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs md:text-sm font-bold shadow-sm transition">
-                            ➕ 학생 수동 추가
-                        </button>
-                        <label class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs md:text-sm font-bold shadow-sm transition">
-                            수강생 파일 업로드
-                            <input type="file" id="upload-student-file" accept=".xls,.xlsx,.csv,.htm,.html" class="hidden" onchange="uploadStudentFile()">
-                        </label>
+
+                    <!-- 우측 버튼 및 안내 문구 영역 -->
+                    <div class="flex flex-col items-start lg:items-end gap-1.5 w-full lg:w-auto">
+                        <div class="flex flex-wrap gap-2">
+                            <a href="/api/admin/students/download-template" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg text-xs md:text-sm font-bold transition shadow-xs flex items-center gap-1">
+                                📥 양식 다운로드
+                            </a>
+                            <button onclick="clearAllStudents()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-2 rounded-lg text-xs md:text-sm font-bold transition shadow-xs">
+                                ⚠️ 명단 초기화
+                            </button>
+                            <button onclick="openAddStudentModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs md:text-sm font-bold shadow-sm transition">
+                                ➕ 학생 수동 추가
+                            </button>
+                            <label class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs md:text-sm font-bold shadow-sm transition">
+                                수강생 파일 업로드
+                                <input type="file" id="upload-student-file" accept=".xls,.xlsx,.csv,.htm,.html" class="hidden" onchange="uploadStudentFile()">
+                            </label>
+                        </div>
+                        <p class="text-[11.5px] text-slate-500 font-medium tracking-tight mt-0.5">
+                            ※ admin - 반관리 - 전체수강생 Excel 다운로드 - 등록할 반만 필터링하여 양식에 붙여넣은 뒤 업로드
+                        </p>
                     </div>
                 </div>
 
@@ -1159,7 +1169,6 @@ def admin_students_view(request: Request):
                 });
             }
 
-            // 학생 수정 모달 열기
             async function openEditStudentModal(username, name, currentClassesStr) {
                 document.getElementById("edit-old-username").value = username;
                 document.getElementById("edit-username").value = username;
@@ -1670,6 +1679,7 @@ def admin_students_view(request: Request):
                 alert(result.message);
                 fileInput.value = "";
                 fetchStudents();
+                fetchClassConfigs();
             }
 
             async function uploadRoomFile() {
@@ -1944,7 +1954,7 @@ def api_seats(username: str, class_name: str):
     if room_data:
         title, orig_rows, orig_cols, grid = room_data[0], room_data[1], room_data[2], json.loads(room_data[3])
     else:
-        title, cols = room_name, 4
+        title = room_name
         grid = [[{"type": "seat", "id": f"{chr(65+r)}{c+1}"} for c in range(4)] for r in range(5)]
         
     cols = len(grid[0]) if grid else 4
@@ -2029,7 +2039,26 @@ def get_students(keyword: str = "", sort_by: str = "username", order: str = "asc
 
     return {"total": total, "filtered_total": len(student_list), "students": student_list}
 
-# 학생 정보 수정 API (아이디/이름/반 일괄 업데이트 및 예약 정보 연동)
+# 표준 수강생 양식 엑셀 파일 실시간 생성 및 다운로드 API
+@app.get("/api/admin/students/download-template")
+def download_student_template():
+    columns = ['번호', '아이디', '이름', '성별', '나이', '출신학교', '출신학과', '졸업여부', '지역', '강좌코드', '강좌명', '수강상태']
+    sample_data = [
+        [1, 'sample01', '홍길동', '남', 24, '김영대학교', '컴퓨터공학과', '재학', '서울', 'KY001', 'BB3B[실전]', '수강중'],
+        [2, 'sample02', '김영희', '여', 23, '김영대학교', '경영학과', '졸업', '경기', 'KY002', 'BJ3A[실전]', '수강중']
+    ]
+    df = pd.DataFrame(sample_data, columns=columns)
+    
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Sheet1')
+    output.seek(0)
+    
+    filename = "수강생파일_양식.xlsx"
+    headers = {'Content-Disposition': f'attachment; filename="{filename}"'}
+    return StreamingResponse(output, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers=headers)
+
+# 학생 정보 수정 API
 @app.post("/api/admin/students/update")
 def update_student_info(
     old_username: str = Form(...),
@@ -2048,28 +2077,24 @@ def update_student_info(
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 아이디를 변경할 경우 중복 검사
     if old_username != new_username:
         cursor.execute("SELECT username FROM students WHERE username = ?", (new_username,))
         if cursor.fetchone():
             conn.close()
             return {"success": False, "message": f"변경하려는 아이디({new_username})가 이미 존재합니다."}
 
-    # 1. 학생 기본 정보 업데이트
     cursor.execute("""
         UPDATE students 
         SET username = ?, name = ?, class_name = ?
         WHERE username = ?
     """, (new_username, name, class_names, old_username))
 
-    # 2. 좌석 예약 내역 동기화
     cursor.execute("""
         UPDATE seat_reservations
         SET username = ?, name = ?
         WHERE username = ?
     """, (new_username, name, old_username))
 
-    # 3. 새로운 반 설정 자동 등록
     for c in class_names.split(','):
         c_clean = c.strip()
         if c_clean and c_clean != '-':
