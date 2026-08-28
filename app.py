@@ -173,6 +173,9 @@ def parse_student_file(contents: bytes) -> pd.DataFrame:
 
     return None
 
+# ==============================================================================
+# 정밀 좌석표 엑셀 파서
+# ==============================================================================
 def parse_seat_excel(contents: bytes):
     import openpyxl
     wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
@@ -325,7 +328,7 @@ def student_view():
                             <div class="flex-1 py-1.5 text-center tracking-widest">칠 판</div>
                             <div class="bg-slate-500 text-white px-3 py-1.5 font-bold">출입문</div>
                         </div>
-                        <div id="excel-blueprint-grid" class="p-2.5 max-h-[45vh] overflow-auto bg-white"></div>
+                        <div id="excel-blueprint-grid" class="p-2.5 max-h-[50vh] overflow-auto bg-white flex justify-center"></div>
                         <div class="bg-slate-50 p-2 border-t border-slate-200 text-[11px] text-slate-600 flex justify-around font-bold">
                             <span><b class="text-emerald-600">■</b> 내 좌석</span>
                             <span><b class="text-red-500">■</b> 신청 완료</span>
@@ -420,7 +423,7 @@ def student_view():
             function selectClass(className) {
                 currentSelectedClass = className;
                 document.getElementById("selected-class-title").innerText = className;
-                document.getElementById("main-card").className = "w-full max-w-5xl bg-white rounded-2xl p-5 sm:p-6 shadow-md border border-slate-200 transition-all duration-300";
+                document.getElementById("main-card").className = "w-full max-w-6xl bg-white rounded-2xl p-5 sm:p-6 shadow-md border border-slate-200 transition-all duration-300";
                 document.getElementById("step-class").classList.add("hidden");
                 document.getElementById("step-seat").classList.remove("hidden");
                 loadSeats();
@@ -457,7 +460,7 @@ def student_view():
                     const bpGrid = document.getElementById("excel-blueprint-grid");
                     bpGrid.innerHTML = "";
                     const table = document.createElement("table");
-                    table.className = "w-full border-collapse text-center text-xs";
+                    table.className = "border-collapse text-center text-xs";
                     
                     data.grid.forEach(row => {
                         const tr = document.createElement("tr");
@@ -469,12 +472,15 @@ def student_view():
                                 if (cell.status_class === 'occupied') bg = "bg-red-100 text-red-700 border-red-400";
                                 
                                 td.className = `border p-1 ${bg}`;
+                                td.style.minWidth = "36px";
                                 td.innerHTML = `<div class="font-bold">${cell.id}</div><div class="text-[9px] text-slate-400 font-normal">| &nbsp; |</div>`;
                             } else if (cell.type === 'aisle') {
-                                td.className = "border-x border-dashed bg-slate-100/70 text-slate-500 font-bold px-1";
+                                td.className = "border-x border-dashed bg-slate-100/70 text-slate-500 font-bold px-1.5";
+                                td.style.minWidth = "24px";
                                 td.innerText = cell.val;
                             } else {
                                 td.className = "border border-slate-200 x-box p-1 text-transparent";
+                                td.style.minWidth = "36px";
                                 td.innerText = "X";
                             }
                             tr.appendChild(td);
@@ -495,16 +501,19 @@ def student_view():
                                 if (cell.status_class === 'mine') color = "bg-emerald-500 text-white border-emerald-600 font-bold shadow-sm ring-2 ring-emerald-300";
                                 if (cell.status_class === 'occupied') color = "bg-red-100 text-red-400 border-red-200 cursor-not-allowed opacity-60";
 
-                                div.className = `p-2 rounded-lg border text-center text-xs font-bold transition ${color}`;
+                                div.className = `p-2 rounded-lg border text-center text-xs font-bold transition flex items-center justify-center ${color}`;
+                                div.style.minHeight = "38px";
                                 div.innerText = cell.id;
                                 if (cell.status_class !== 'occupied') {
                                     div.onclick = () => reserveSeat(cell.id);
                                 }
                             } else if (cell.type === 'aisle') {
                                 div.className = "flex items-center justify-center text-[11px] font-bold text-slate-400 bg-slate-200/50 rounded";
+                                div.style.minHeight = "38px";
                                 div.innerText = cell.val;
                             } else {
                                 div.className = "p-2 opacity-0";
+                                div.style.minHeight = "38px";
                             }
                             container.appendChild(div);
                         });
@@ -554,7 +563,7 @@ def student_view():
     """
 
 # ==============================================================================
-# 2. 관리자 화면 (강의실명 옆 좌석수 표기 적용)
+# 2. 관리자 화면
 # ==============================================================================
 @app.get("/admin/students", response_class=HTMLResponse)
 def admin_students_view(request: Request):
@@ -702,7 +711,7 @@ def admin_students_view(request: Request):
                                 <th class="py-3.5 px-2 text-center w-16">열</th>
                                 <th class="py-3.5 px-3 w-40">배정 강의실(좌석수)</th>
                                 <th class="py-3.5 px-3 w-52 text-center">자동 리셋 주기 / 일시</th>
-                                <th class="py-3.5 px-2 text-center w-16">저장</th>
+                                <th class="py-3.5 px-2 text-center w-20">저장</th>
                                 <th class="py-3.5 px-2 text-center w-20">즉시리셋</th>
                                 <th class="py-3.5 px-2 text-center w-16">인쇄</th>
                             </tr>
@@ -1218,7 +1227,7 @@ def admin_students_view(request: Request):
                                 <input type="text" id="reset-dt-display-${idx}" value="${displayDtText}" readonly onclick="openDateTimePickerModal(${idx}, '${c.class_name}')" class="border border-slate-300 rounded px-2 py-1 text-xs font-bold text-slate-700 bg-white hover:bg-blue-50/50 cursor-pointer w-48 text-center transition shadow-xs" title="클릭하여 달력 및 주기 선택">
                             </td>
                             <td class="py-3 px-1 text-center">
-                                <button onclick="saveClassConfig('${c.class_name}', ${idx})" class="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg hover:bg-blue-700 font-bold shadow-xs">저장</button>
+                                <button onclick="saveClassConfig('${c.class_name}', ${idx})" id="save-btn-${idx}" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 font-bold shadow-xs transition">저장</button>
                             </td>
                             <td class="py-3 px-1 text-center">
                                 <button onclick="resetClassNow('${c.class_name}')" class="text-xs bg-rose-500 text-white px-2 py-1 rounded-lg hover:bg-rose-600 font-bold shadow-xs">초기화</button>
@@ -1464,19 +1473,42 @@ def admin_students_view(request: Request):
             }
 
             async function saveClassConfig(className, idx) {
+                const saveBtn = document.getElementById(`save-btn-${idx}`);
+                const origText = saveBtn.innerText;
+                saveBtn.disabled = true;
+                saveBtn.innerText = "저장중...";
+
                 const room = document.getElementById(`room-${idx}`).value;
                 const rows = document.getElementById(`rows-${idx}`).value || 0;
                 const cols = document.getElementById(`cols-${idx}`).value || 0;
                 const resetDt = document.getElementById(`reset-dt-${idx}`).value || "";
 
-                const res = await fetch("/api/admin/classes/update", {
-                    method: "POST",
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `class_name=${encodeURIComponent(className)}&room_name=${encodeURIComponent(room)}&rows_count=${rows}&cols_count=${cols}&reset_datetime=${encodeURIComponent(resetDt)}`
-                });
-                const result = await res.json();
-                alert(result.message);
-                fetchClassConfigs();
+                try {
+                    const res = await fetch("/api/admin/classes/update", {
+                        method: "POST",
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `class_name=${encodeURIComponent(className)}&room_name=${encodeURIComponent(room)}&rows_count=${rows}&cols_count=${cols}&reset_datetime=${encodeURIComponent(resetDt)}`
+                    });
+                    const result = await res.json();
+
+                    if (result.success) {
+                        saveBtn.innerText = "✓ 완료";
+                        saveBtn.className = "text-xs bg-emerald-600 text-white px-3 py-1 rounded-lg font-bold shadow-xs transition";
+                        setTimeout(() => {
+                            saveBtn.innerText = origText;
+                            saveBtn.className = "text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 font-bold shadow-xs transition";
+                            saveBtn.disabled = false;
+                        }, 1200);
+                    } else {
+                        alert(result.message);
+                        saveBtn.innerText = origText;
+                        saveBtn.disabled = false;
+                    }
+                } catch (e) {
+                    alert("저장 중 오류가 발생했습니다.");
+                    saveBtn.innerText = origText;
+                    saveBtn.disabled = false;
+                }
             }
 
             async function resetClassNow(className) {
@@ -1557,7 +1589,7 @@ def admin_students_view(request: Request):
     """
 
 # ==============================================================================
-# 3. 당일 신청 좌석표 인쇄 뷰어 (상단 헤더에 강의실 좌석수 표기)
+# 3. 당일 신청 좌석표 인쇄 뷰어
 # ==============================================================================
 @app.get("/admin/print-seating-chart", response_class=HTMLResponse)
 def print_seating_chart(class_name: str = ""):
@@ -1568,8 +1600,6 @@ def print_seating_chart(class_name: str = ""):
     cursor.execute("SELECT room_name, rows_count, cols_count FROM class_configs WHERE class_name = ?", (class_name,))
     config = cursor.fetchone()
     room_name = config[0] if config else "301호"
-    custom_rows = config[1] if config else 0
-    custom_cols = config[2] if config else 0
     
     cursor.execute("SELECT title, rows_count, cols_count, grid_json FROM rooms WHERE room_name = ?", (room_name,))
     room_data = cursor.fetchone()
@@ -1579,11 +1609,7 @@ def print_seating_chart(class_name: str = ""):
     else:
         title = room_name
         grid = [[{"type": "seat", "id": f"{chr(65+r)}{c+1}"} for c in range(4)] for r in range(5)]
-        
-    if custom_rows > 0: grid = grid[:custom_rows]
-    if custom_cols > 0: grid = [row[:custom_cols] for row in grid]
 
-    # 실제 유효 좌석 수 계산
     actual_seat_count = sum(1 for row in grid for cell in row if cell.get("type") == "seat")
 
     cursor.execute("SELECT seat_id, name, username FROM seat_reservations WHERE class_name = ?", (class_name,))
@@ -1759,22 +1785,18 @@ def api_seats(username: str, class_name: str):
     
     cursor.execute("SELECT room_name, rows_count, cols_count FROM class_configs WHERE class_name = ?", (class_name,))
     config = cursor.fetchone()
-    room_name, custom_rows, custom_cols = (config[0], config[1], config[2]) if config else ("301호", 0, 0)
+    room_name = config[0] if config else "301호"
     
     cursor.execute("SELECT title, rows_count, cols_count, grid_json FROM rooms WHERE room_name = ?", (room_name,))
     room_data = cursor.fetchone()
     
     if room_data:
         title, orig_rows, orig_cols, grid = room_data[0], room_data[1], room_data[2], json.loads(room_data[3])
-        cols = orig_cols
     else:
-        title, cols = room_name, 4
+        title = room_name
         grid = [[{"type": "seat", "id": f"{chr(65+r)}{c+1}"} for c in range(4)] for r in range(5)]
         
-    if custom_rows > 0: grid = grid[:custom_rows]
-    if custom_cols > 0:
-        cols = custom_cols
-        grid = [row[:custom_cols] for row in grid]
+    cols = len(grid[0]) if grid else 4
 
     cursor.execute("SELECT seat_id, username FROM seat_reservations WHERE class_name = ?", (class_name,))
     reservations = dict(cursor.fetchall())
