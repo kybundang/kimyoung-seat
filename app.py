@@ -560,7 +560,7 @@ def student_view():
     """
 
 # ==============================================================================
-# 2. 관리자 화면 (전체화면 모드 버튼 및 오버레이 완비)
+# 2. 관리자 화면 (학생 수정 버튼 및 모달 완비)
 # ==============================================================================
 @app.get("/admin/students", response_class=HTMLResponse)
 def admin_students_view(request: Request):
@@ -579,7 +579,7 @@ def admin_students_view(request: Request):
         <header id="mobile-header" class="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs">
             <div class="flex items-center gap-3">
                 <button onclick="toggleMobileDrawer()" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold transition">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke_linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                 </button>
                 <h1 class="text-base font-extrabold text-blue-700">김영편입 좌석관리</h1>
             </div>
@@ -662,7 +662,7 @@ def admin_students_view(request: Request):
                     <input type="text" id="search-keyword" oninput="fetchStudents()" placeholder="아이디, 이름 또는 반명 검색..." class="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 font-medium">
                 </div>
                 <div class="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
-                    <table class="w-full text-left text-sm min-w-[550px]">
+                    <table class="w-full text-left text-sm min-w-[620px]">
                         <thead class="bg-slate-50 border-b text-xs font-bold text-slate-500 select-none">
                             <tr>
                                 <th onclick="toggleSort('username')" class="py-3 px-4 w-40 cursor-pointer hover:bg-slate-100 transition">
@@ -674,8 +674,8 @@ def admin_students_view(request: Request):
                                 <th onclick="toggleSort('class_name')" class="py-3 px-4 cursor-pointer hover:bg-slate-100 transition">
                                     <div class="flex items-center gap-1">수강 반 목록 <span id="sort-icon-class_name" class="text-slate-400">↕</span></div>
                                 </th>
-                                <th class="py-3 px-3 w-24 text-center">비밀번호</th>
-                                <th class="py-3 px-3 w-20 text-center">관리</th>
+                                <th class="py-3 px-3 w-20 text-center">비밀번호</th>
+                                <th class="py-3 px-3 w-32 text-center">관리</th>
                             </tr>
                         </thead>
                         <tbody id="student-tbody" class="divide-y divide-slate-100"></tbody>
@@ -760,7 +760,7 @@ def admin_students_view(request: Request):
             <button onclick="exitQrFullscreen()" class="absolute top-6 right-6 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold transition flex items-center gap-1.5 backdrop-blur-md">
                 ✕ 전체화면 종료 (ESC)
             </button>
-            <div class="bg-white border-4 border-blue-500 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center animate-fade-in">
+            <div class="bg-white border-4 border-blue-500 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center">
                 <div class="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 mb-5">
                     <div id="fs-qr-live-date" class="text-xs font-extrabold text-blue-900"></div>
                     <div id="fs-qr-live-clock" class="text-2xl font-black text-blue-600 font-mono mt-0.5 tracking-wider">00:00:00</div>
@@ -771,6 +771,71 @@ def admin_students_view(request: Request):
                 </div>
                 <p class="text-sm font-black text-blue-600 mb-1">카메라로 스캔 ➔ 로그인 ➔ 좌석 선택</p>
                 <p class="text-xs text-slate-400 font-medium">초기 비밀번호는 1234 입니다.</p>
+            </div>
+        </div>
+
+        <!-- 학생 정보 수정 모달 -->
+        <div id="edit-student-modal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
+                    <h3 class="text-base font-extrabold text-slate-900">✏️ 학생 정보 수정</h3>
+                    <button onclick="closeEditStudentModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+                </div>
+
+                <div class="space-y-4 mb-6">
+                    <input type="hidden" id="edit-old-username">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">아이디</label>
+                        <input type="text" id="edit-username" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold outline-none focus:border-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">이름</label>
+                        <input type="text" id="edit-name" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold outline-none focus:border-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">수강 반 선택 (복수 선택 가능)</label>
+                        <div id="edit-class-options" class="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-1.5 bg-slate-50"></div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button onclick="closeEditStudentModal()" class="px-4 py-2 bg-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-300">취소</button>
+                    <button onclick="submitEditStudent()" class="px-5 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 shadow-sm">수정 저장</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 학생 수동 추가 모달 -->
+        <div id="add-student-modal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
+                    <h3 class="text-base font-bold text-slate-900">➕ 학생 수동 추가</h3>
+                    <button onclick="closeAddStudentModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+                </div>
+
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">아이디</label>
+                        <input type="text" id="add-username" placeholder="예: kimyoung123" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold outline-none focus:border-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">이름</label>
+                        <input type="text" id="add-name" placeholder="예: 홍길동" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold outline-none focus:border-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">수강 반 선택 (복수 선택 가능)</label>
+                        <div id="add-class-options" class="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-1.5 bg-slate-50"></div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button onclick="closeAddStudentModal()" class="px-4 py-2 bg-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-300">취소</button>
+                    <button onclick="submitAddStudent()" class="px-5 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 shadow-sm">추가 등록</button>
+                </div>
             </div>
         </div>
 
@@ -873,38 +938,6 @@ def admin_students_view(request: Request):
                         <button onclick="closeDateTimePickerModal()" class="px-3.5 py-2 bg-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-300 transition">취소</button>
                         <button onclick="confirmDateTimePickerModal()" class="px-5 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 shadow-sm transition">설정 적용</button>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 학생 수동 추가 모달 -->
-        <div id="add-student-modal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 p-4">
-            <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col">
-                <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
-                    <h3 class="text-base font-bold text-slate-900">➕ 학생 수동 추가</h3>
-                    <button onclick="closeAddStudentModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
-                </div>
-
-                <div class="space-y-4 mb-6">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">아이디</label>
-                        <input type="text" id="add-username" placeholder="예: kimyoung123" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold outline-none focus:border-blue-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">이름</label>
-                        <input type="text" id="add-name" placeholder="예: 홍길동" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold outline-none focus:border-blue-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">수강 반 선택 (복수 선택 가능)</label>
-                        <div id="add-class-options" class="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-1.5 bg-slate-50"></div>
-                    </div>
-                </div>
-
-                <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                    <button onclick="closeAddStudentModal()" class="px-4 py-2 bg-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-300">취소</button>
-                    <button onclick="submitAddStudent()" class="px-5 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 shadow-sm">추가 등록</button>
                 </div>
             </div>
         </div>
@@ -1103,20 +1136,86 @@ def admin_students_view(request: Request):
                 const tbody = document.getElementById("student-tbody");
                 tbody.innerHTML = "";
                 data.students.forEach(s => {
+                    const safeUsername = s.username.replace(/'/g, "\\'");
+                    const safeName = s.name.replace(/'/g, "\\'");
+                    const safeClasses = s.class_name.replace(/'/g, "\\'");
+
                     tbody.innerHTML += `
                         <tr class="hover:bg-slate-50 font-medium text-xs md:text-sm">
                             <td class="py-2.5 px-4 font-mono text-slate-700 font-bold">${s.username}</td>
                             <td class="py-2.5 px-4 font-bold text-slate-900">${s.name}</td>
                             <td class="py-2.5 px-4 text-slate-600 font-medium">${s.class_name}</td>
                             <td class="py-2.5 px-3 text-center">
-                                <button onclick="resetPassword('${s.username}')" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded border font-bold">초기화</button>
+                                <button onclick="resetPassword('${safeUsername}')" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded border font-bold">초기화</button>
                             </td>
                             <td class="py-2.5 px-3 text-center">
-                                <button onclick="deleteStudent('${s.username}')" class="text-xs text-red-500 hover:text-red-700 font-bold">삭제</button>
+                                <div class="flex items-center justify-center gap-1.5">
+                                    <button onclick="openEditStudentModal('${safeUsername}', '${safeName}', '${safeClasses}')" class="text-xs bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 px-2 py-1 rounded font-bold transition shadow-2xs">수정</button>
+                                    <button onclick="deleteStudent('${safeUsername}')" class="text-xs text-red-500 hover:text-red-700 font-bold px-1 py-1">삭제</button>
+                                </div>
                             </td>
                         </tr>
                     `;
                 });
+            }
+
+            // 학생 수정 모달 열기
+            async function openEditStudentModal(username, name, currentClassesStr) {
+                document.getElementById("edit-old-username").value = username;
+                document.getElementById("edit-username").value = username;
+                document.getElementById("edit-name").value = name;
+
+                const currentClasses = currentClassesStr.split(',').map(c => c.trim());
+
+                const res = await fetch("/api/admin/classes");
+                const data = await res.json();
+                const classContainer = document.getElementById("edit-class-options");
+                classContainer.innerHTML = "";
+
+                if (data.classes.length === 0) {
+                    classContainer.innerHTML = `<div class="text-xs text-slate-400 py-2 text-center font-bold">등록된 반이 없습니다.</div>`;
+                } else {
+                    data.classes.forEach(c => {
+                        const isChecked = currentClasses.includes(c.class_name);
+                        classContainer.innerHTML += `
+                            <label class="flex items-center gap-2 cursor-pointer p-1 hover:bg-white rounded transition">
+                                <input type="checkbox" name="edit-student-class" value="${c.class_name}" ${isChecked ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded">
+                                <span class="text-xs font-bold text-slate-800">${c.class_name}</span>
+                            </label>
+                        `;
+                    });
+                }
+
+                document.getElementById("edit-student-modal").classList.replace("hidden", "flex");
+            }
+
+            function closeEditStudentModal() {
+                document.getElementById("edit-student-modal").classList.replace("flex", "hidden");
+            }
+
+            async function submitEditStudent() {
+                const oldUsername = document.getElementById("edit-old-username").value.trim();
+                const newUsername = document.getElementById("edit-username").value.trim();
+                const name = document.getElementById("edit-name").value.trim();
+                const checkboxes = document.querySelectorAll('input[name="edit-student-class"]:checked');
+                const selectedClasses = Array.from(checkboxes).map(cb => cb.value);
+
+                if (!newUsername || !name) { alert("아이디와 이름을 입력해 주세요."); return; }
+                if (selectedClasses.length === 0) { alert("수강 반을 최소 하나 선택해 주세요."); return; }
+
+                const res = await fetch("/api/admin/students/update", {
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `old_username=${encodeURIComponent(oldUsername)}&new_username=${encodeURIComponent(newUsername)}&name=${encodeURIComponent(name)}&class_names=${encodeURIComponent(selectedClasses.join(', '))}`
+                });
+
+                const data = await res.json();
+                alert(data.message);
+                if (data.success) {
+                    closeEditStudentModal();
+                    fetchStudents();
+                    fetchClassConfigs();
+                }
             }
 
             async function openAddStudentModal() {
@@ -1929,6 +2028,55 @@ def get_students(keyword: str = "", sort_by: str = "username", order: str = "asc
         student_list.append({"username": u_id, "name": u_name, "class_name": c_str})
 
     return {"total": total, "filtered_total": len(student_list), "students": student_list}
+
+# 학생 정보 수정 API (아이디/이름/반 일괄 업데이트 및 예약 정보 연동)
+@app.post("/api/admin/students/update")
+def update_student_info(
+    old_username: str = Form(...),
+    new_username: str = Form(...),
+    name: str = Form(...),
+    class_names: str = Form(...)
+):
+    old_username = old_username.strip()
+    new_username = new_username.strip()
+    name = name.strip()
+    class_names = class_names.strip()
+
+    if not new_username or not name:
+        return {"success": False, "message": "아이디와 이름을 입력해 주세요."}
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 아이디를 변경할 경우 중복 검사
+    if old_username != new_username:
+        cursor.execute("SELECT username FROM students WHERE username = ?", (new_username,))
+        if cursor.fetchone():
+            conn.close()
+            return {"success": False, "message": f"변경하려는 아이디({new_username})가 이미 존재합니다."}
+
+    # 1. 학생 기본 정보 업데이트
+    cursor.execute("""
+        UPDATE students 
+        SET username = ?, name = ?, class_name = ?
+        WHERE username = ?
+    """, (new_username, name, class_names, old_username))
+
+    # 2. 좌석 예약 내역 동기화
+    cursor.execute("""
+        UPDATE seat_reservations
+        SET username = ?, name = ?
+        WHERE username = ?
+    """, (new_username, name, old_username))
+
+    # 3. 새로운 반 설정 자동 등록
+    for c in class_names.split(','):
+        c_clean = c.strip()
+        if c_clean and c_clean != '-':
+            cursor.execute("INSERT OR IGNORE INTO class_configs (class_name, room_name, rows_count, cols_count) VALUES (?, '301호', 0, 0)", (c_clean,))
+
+    conn.close()
+    return {"success": True, "message": "학생 정보가 성공적으로 수정되었습니다."}
 
 @app.post("/api/admin/students/clear-all")
 def clear_all_students():
