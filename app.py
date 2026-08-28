@@ -8,6 +8,7 @@ import json
 import hashlib
 from collections import Counter
 from datetime import datetime
+import urllib.parse
 import os
 
 app = FastAPI()
@@ -579,7 +580,7 @@ def admin_students_view(request: Request):
         <header id="mobile-header" class="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-xs">
             <div class="flex items-center gap-3">
                 <button onclick="toggleMobileDrawer()" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold transition">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke_linecap="round" stroke_linejoin="round" stroke_width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                 </button>
                 <h1 class="text-base font-extrabold text-blue-700">김영편입 좌석관리</h1>
             </div>
@@ -633,7 +634,6 @@ def admin_students_view(request: Request):
                         <p id="summary-text" class="text-xs md:text-sm text-slate-500 mt-1 font-medium">불러오는 중...</p>
                     </div>
 
-                    <!-- 우측 버튼 및 안내 문구 영역 -->
                     <div class="flex flex-col items-start lg:items-end gap-1.5 w-full lg:w-auto">
                         <div class="flex flex-wrap gap-2">
                             <a href="/api/admin/students/download-template" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg text-xs md:text-sm font-bold transition shadow-xs flex items-center gap-1">
@@ -2039,7 +2039,7 @@ def get_students(keyword: str = "", sort_by: str = "username", order: str = "asc
 
     return {"total": total, "filtered_total": len(student_list), "students": student_list}
 
-# 표준 수강생 양식 엑셀 파일 실시간 생성 및 다운로드 API
+# 표준 수강생 양식 엑셀 파일 실시간 생성 및 다운로드 API (RFC 5987 UTF-8 인코딩 적용)
 @app.get("/api/admin/students/download-template")
 def download_student_template():
     columns = ['번호', '아이디', '이름', '성별', '나이', '출신학교', '출신학과', '졸업여부', '지역', '강좌코드', '강좌명', '수강상태']
@@ -2055,7 +2055,10 @@ def download_student_template():
     output.seek(0)
     
     filename = "수강생파일_양식.xlsx"
-    headers = {'Content-Disposition': f'attachment; filename="{filename}"'}
+    encoded_filename = urllib.parse.quote(filename)
+    headers = {
+        'Content-Disposition': f"attachment; filename*=UTF-8''{encoded_filename}"
+    }
     return StreamingResponse(output, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers=headers)
 
 # 학생 정보 수정 API
@@ -2330,6 +2333,7 @@ async def upload_students_file(file: UploadFile = File(...)):
     for c in unique_classes:
         cursor.execute("INSERT OR IGNORE INTO class_configs (class_name, room_name, rows_count, cols_count) VALUES (?, '301호', 0, 0)", (c,))
 
+    conn.commit()
     conn.close()
     return {"message": f"총 {len(grouped)}명의 학생과 {len(unique_classes)}개 반 목록이 등록되었습니다!"}
 
@@ -2369,6 +2373,7 @@ async def upload_room_excel(file: UploadFile = File(...)):
         WHERE rows_count = 0 OR cols_count = 0
     """, (first_room["room_name"], first_room["rows_count"], first_room["cols_count"]))
         
+    conn.commit()
     conn.close()
     room_summary = ", ".join([f"{r['room_name']} ({r['total_seat_count']}석)" for r in parsed_rooms])
     return {"message": f"총 {len(parsed_rooms)}개 강의실 좌석표가 정확히 등록되었습니다!\n({room_summary})"}
